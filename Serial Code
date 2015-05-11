@@ -1,0 +1,110 @@
+//******************************************************************************************************************************//
+//*********************PARALLEL IMPLEMENATATION OF DIJKSTRA ALGORITHM USING NVIDIA CUDA AND C***********************************//
+//**********************************////////////////////////////////////////////////////////////********************************//
+//***********************************************PROJECT TEAM********************************************************************//
+//*****************************PRAKHAR AGRAWAL                  121112082*******************************************************//
+//*****************************SOURABH KULKARNI                 121112002*******************************************************//
+//*****************************SOURABH DOLIYA                   121112040*******************************************************//
+//*****************************PRASHANT RAJ PARIHAR             121112084*******************************************************//
+//******************************************************************************************************************************//
+//******************************************************************************************************************************//
+
+#include<stdio.h>
+#include<vector>
+#include<queue>
+#include<algorithm>
+#include<iostream>
+#include <windows.h>
+using namespace std;
+#define INF 1000000009
+vector< pair<int,int> >graph[10000000]; // Globally declarating a vector for graph
+
+
+
+void dijkstra(int Source, int Num_Vertex)
+ {
+    vector<int> dist(Num_Vertex,INF); // Vector which wil contain the minimum distance for each vertex
+
+    priority_queue< pair<int,int>, vector< pair<int,int> > , greater< pair<int,int> >  > que; // Priority queue vertex and its possible distance from source
+
+    que.push(make_pair(0,Source));
+    /*
+    Each time the top of priority queue will consist the vertex with minimum distance.
+    Relax the vertex if not yet relaxed and update its distance from source into vector(dist).
+    */
+    while(!que.empty()) // Repeat the same step until priority queue is empty
+    {
+
+      pair<int,int>top=que.top();
+      int x=top.first;
+      int y=top.second;
+
+      que.pop();
+      if(x<dist[y])
+       {
+         //  cout<<y<<endl;
+          /*
+           If the sum of distance of the connected vertex from the relaxed vertex and distance of relaxed vertex from source is
+           less than the distance of vertex from source then insert this vertex with the sum in priority queue.
+           */
+
+           dist[y]=x;
+           vector< pair<int,int> >::iterator itr; // Iterator itr used to acces the vector
+           for(itr=graph[y].begin();itr<graph[y].end();itr++)
+           {
+             if((*itr).second+x<dist[(*itr).first])
+               que.push(make_pair((*itr).second+x,(*itr).first));
+           }
+       }
+    }
+
+    int i;
+
+    /*
+    For each vertex print the shortest distance from the source
+    */
+
+    for(i=0;i<Num_Vertex;i++)
+         cout<<Source<<" "<<i<<" "<<dist[i]<<endl;
+         //cout<<Source<<" "<<i<<" "<<dist[i]<<endl;
+ }
+int main()
+{
+
+     LARGE_INTEGER frequency;        // ticks per second
+    LARGE_INTEGER t1, t2;           // ticks
+    double elapsedTime;             // Variable Calculating the time required for serial implementation on graph
+      QueryPerformanceFrequency(&frequency);
+    QueryPerformanceCounter(&t1);
+
+
+     freopen("D:\\Cuda\\output.txt","r",stdin); // Input of a file type output containing the inputs for graph
+    freopen("D:\\Cuda\\shortest_path.txt","w",stdout); // File containing the shortest path of each vertex from source
+
+     int Num_Vertex,Max_possible_edge;
+      cin>>Num_Vertex>>Max_possible_edge;// Inputting no. of vertex and maximum no. of possible edges for allocating memory
+
+     int Source,Destination;
+          cin>>Source>>Destination; // The two vertex on which an edge is incident
+   int f=0;
+  while(Source!=-1 && Destination!=-1) // If vertexes are -1,-1 that means no more edge
+  {
+      int Weight;
+      cin>>Weight; // Weight of each edge
+
+      graph[Source].push_back(make_pair(Destination,Weight)); // Vector of a vertex containing all other vertex which is connected and the weight of the that edge
+      graph[Destination].push_back(make_pair(Source,Weight)); // Vector of a vertex containing all other vertex which is connected and the weight of the that edge
+      f++;
+     cin>>Source>>Destination; // Scanning each edge
+  }
+ //  cout<<"f="<<f<<endl;
+       int Single_Source;
+        cin>>Single_Source; // Source from which the minimum distance of each edge will be calculated
+
+    dijkstra(Single_Source,Num_Vertex); // Function call
+ QueryPerformanceCounter(&t2);
+     elapsedTime = (t2.QuadPart - t1.QuadPart) * 1000.0 / frequency.QuadPart;
+       cout<<"TIME:"<<elapsedTime<<" ms"<<endl; // Time required to calculate shortest path for each vertex
+
+ return 0;
+}
