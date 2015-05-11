@@ -1,0 +1,91 @@
+#include<stdio.h>
+#include<algorithm>
+#include<queue>
+#include<iostream>
+#include<list>
+#include<vector>
+#include<stack>
+#include<time.h>
+using namespace std;
+int main()
+{
+
+   freopen("D:\\Cuda\\input.txt","r",stdin);
+  freopen("D:\\Cuda\\output.txt","w",stdout);
+
+
+   long long int Number_Vertex,Node_Degree,Max_Weight;
+
+   scanf("%lld",&Number_Vertex);
+
+   printf("%lld %lld\n",Number_Vertex,((Number_Vertex)*(Number_Vertex-1)));
+
+   scanf("%lld",&Node_Degree);
+   scanf("%lld",&Max_Weight);
+  long long int i=1,j;
+
+  vector<int>Random_Vector[Number_Vertex];
+
+   srand(time(NULL));
+
+  for(i=1;i<Number_Vertex;i++)
+  {
+      long long int Random_Vertex_1=0;
+
+   long long int Random_Vertex_2=i;
+
+      long long int Weight=((rand())%Max_Weight)+1;
+      if(Random_Vertex_1==Random_Vertex_2)
+       continue;
+   vector<int>::iterator itr1= find(Random_Vector[Random_Vertex_1].begin(),Random_Vector[Random_Vertex_1].end(),Random_Vertex_2);
+      if(itr1==Random_Vector[Random_Vertex_1].end())
+     {
+         Random_Vector[Random_Vertex_1].push_back(Random_Vertex_2);
+         Random_Vector[Random_Vertex_2].push_back(Random_Vertex_1);
+
+         printf("%lld %lld %lld\n",Random_Vertex_1,Random_Vertex_2,Weight);
+     }
+  }
+ for(i=1;i<Number_Vertex;i++)
+  {
+      int count=0;
+      int c=Node_Degree;
+    while(count!=c)
+    {
+   long long int Random_Vertex_1=(i)%Number_Vertex;
+
+   long long int Random_Vertex_2=((rand())%Number_Vertex);
+
+  long long int Weight=((rand())%Max_Weight)+1;
+
+  // srand(time(NULL));
+
+  // Random_Vertex_2=(Random_Vertex_2*rand())%Number_Vertex;
+
+    if(Random_Vertex_1==Random_Vertex_2)
+       continue;
+   vector<int>::iterator itr1= find(Random_Vector[Random_Vertex_1].begin(),Random_Vector[Random_Vertex_1].end(),Random_Vertex_2);
+
+     if(itr1==Random_Vector[Random_Vertex_1].end())
+     {
+         count++;
+
+         Random_Vector[Random_Vertex_1].push_back(Random_Vertex_2);
+         Random_Vector[Random_Vertex_2].push_back(Random_Vertex_1);
+
+         printf("%lld %lld %lld\n",Random_Vertex_1,Random_Vertex_2,Weight);
+     }
+     else
+        c--;
+    }
+  }
+
+
+  printf("-1 -1\n");
+
+  int Source;
+  cin>>Source;
+  cout<<Source;
+
+ return 0;
+}
