@@ -1,0 +1,216 @@
+#include<stdio.h>
+#include<vector>
+#include<iostream>
+#include<string.h>
+#include <windows.h>
+#include<cuda.h>
+#define INF 1000000000
+using namespace std;
+
+struct Graph
+{
+	int start;
+	int end;
+	int weight;
+};
+
+__global__ void reduce_min_kernel(bool *d_mask, int *d_in, int *d_index, int *d_out, int n)
+{
+
+	int tid = threadIdx.x;
+	//printf("yes\n");// Local thread index
+	int myId = blockIdx.x * blockDim.x + threadIdx.x;// Global thread index
+	if (myId<n)
+	{
+		int k = blockDim.x;
+		int flag = 0;
+		for (unsigned int s = ceil(blockDim.x*1.0 / 2.0); s>0; s >>= 1)
+		{
+			if (k % 2 == 1 && flag == 1)
+				s = s + 1;
+			if (tid < (s))
+			{
+				if (d_mask[myId] == false)
+				{
+					if (tid == k / 2)
+					{
+						d_in[myId] = d_in[myId];
+						d_index[myId] = d_index[myId];
+					}
+					else
+					{
+						//printf("%d %d %d\n", d_in[myId], myId, s);
+						if (myId + s < n && d_mask[myId + s] == false)
+						{
+							if (d_in[myId]>d_in[myId + s])
+							{
+								d_in[myId] = d_in[myId + s];
+								d_index[myId] = d_index[myId + s];
+								//	printf("%d %d\n", d_index[myId],d_index[myId+s]);
+							}
+							else
+							{
+								d_in[myId] = d_in[myId];
+								d_index[myId] = d_index[myId];
+							}
+						}
+						else
+						{
+							d_in[myId] = d_in[myId];
+							d_index[myId] = d_index[myId];
+						}
+						//printf("%d %d\n", d_in[myId], myId);
+
+					}
+				}
+				else if (myId + s < n && d_mask[myId + s] == false)
+				{
+					d_mask[myId] = false;
+					d_in[myId] = d_in[myId + s];
+					d_index[myId] = d_index[myId + s];
+				}
+
+			}
+			k = s;
+			flag = 1;
+			__syncthreads();
+
+		}
+	}
+	__syncthreads();
+	if (tid == 0)
+	{
+		if (d_mask[myId] == false)
+		{
+			d_in[blockIdx.x] = d_in[myId];
+		//	printf("%d %d %d\n", blockIdx.x, myId, d_in[myId]);
+			d_index[blockIdx.x] = d_index[myId];
+		}
+		else
+		{
+			d_in[blockIdx.x] = INF;
+			d_index[blockIdx.x] = -1;
+		}
+	}
+}
+
+__global__ void dijkstra(struct Graph*d_graph, int d_cost[], int size, int ind)
+{
+	int tid = blockDim.x * blockIdx.x + threadIdx.x;
+
+	if (tid <= size)
+	{
+		if (d_graph[tid].start == ind)
+		{
+			if (d_cost[d_graph[tid].end] > d_cost[d_graph[tid].start] + d_graph[tid].weight)
+			{
+				d_cost[d_graph[tid].end] = d_cost[d_graph[tid].start] + d_graph[tid].weight;
+			}
+		}
+		__syncthreads();
+	}
+}
+int main()
+{
+	LARGE_INTEGER frequency;        // ticks per second
+	LARGE_INTEGER t1, t2, t3, t4;           // ticks
+	double elapsedTime;
+	
+	freopen("output.txt", "r", stdin);
+	freopen("shortest_cuda.txt", "w", stdout);
+	int Num_Vertex, Max_possible_Edge;
+	scanf("%d %d", &Num_Vertex, &Max_possible_Edge);
+	cout << "YES" << endl;
+	struct Graph * graph = (struct Graph *)malloc(sizeof(struct Graph)*Max_possible_Edge);
+	cout << "YES" << endl;
+	 int Edge1, Edge2, i = 0, Source;
+	scanf("%d %d", &Edge1, &Edge2);
+
+	while (Edge1 != -1 && Edge2 != -1)
+	{
+		graph[i].start = Edge1;
+		graph[i].end = Edge2;
+		cin >> graph[i].weight;
+		i++;
+		graph[i].end = Edge1;
+		graph[i].start = Edge2;
+		graph[i].weight = graph[i - 1].weight;
+		i++;
+	//	cout << Edge1 << " " << Edge2 << endl;
+		cin >> Edge1 >> Edge2;
+	}
+	
+	 int Num_Edges = i;
+	cout << i << endl;
+	cin >> Source;
+	int Num_Blocks, Threads_Per_Block;
+	Num_Blocks = (int)ceil(Num_Edges*1.0 / (512 * 1.0));
+	Threads_Per_Block = (int)ceil(Num_Edges*1.0 / (Num_Blocks*1.0));
+	int Num2 = (int)ceil(Num_Vertex*1.0 / (512 * 1.0));
+	int Threads2 = 512;//(int)ceil(Num_Vertex*1.0 / (Num2*1.0));
+	int *h_cost = (int *)malloc(sizeof(int)*Num_Vertex);
+	int *h_index = (int *)malloc(sizeof(int)*Num_Vertex);
+	int *h_out = (int *)malloc(sizeof(int)*Num_Vertex);
+	bool *h_mask = (bool*)malloc(sizeof(bool)* Num_Vertex);
+	cout << "yes";
+	for (i = 0; i < Num_Vertex; i++)
+	{
+		h_cost[i] = INF;
+		h_index[i] = i;
+		h_mask[i] = false;
+	}
+
+	h_cost[Source] = 0;
+	
+	int *d_cost, *d_index, *d_out;
+	bool *d_mask;
+	struct Graph * d_graph;
+	//cout << "yes2";
+	cudaMalloc((void**)&d_cost, sizeof(int)*Num_Vertex);
+	cudaMalloc((void**)&d_index, sizeof(int)*Num_Vertex);
+	cudaMalloc((void**)&d_out, sizeof(int)* Num_Vertex);
+	cudaMalloc((void**)&d_mask, sizeof(bool)*Num_Vertex);
+	cudaMalloc((void**)&d_graph, sizeof(struct Graph)*Max_possible_Edge);
+
+	cudaMemcpy(d_graph, graph, sizeof(struct Graph)*Max_possible_Edge, cudaMemcpyHostToDevice);
+	//cout << "yes3";
+	double total_time = 0.0;
+	QueryPerformanceFrequency(&frequency);
+	QueryPerformanceCounter(&t1);
+	while (1)
+	{
+		int min_ind = -1;
+		int min_weight = INF;
+		//h_mask[min_ind] = true;
+
+		cudaMemcpy(d_cost, h_cost, sizeof(int)*Num_Vertex, cudaMemcpyHostToDevice);
+		cudaMemcpy(d_index, h_index, sizeof(int)*Num_Vertex, cudaMemcpyHostToDevice);
+		cudaMemcpy(d_mask, h_mask, sizeof(bool)*Num_Vertex, cudaMemcpyHostToDevice);
+
+		reduce_min_kernel << < Num2, Threads2 >> >(d_mask, d_cost, d_index, d_out, Num_Vertex);
+		reduce_min_kernel << < 1, Threads2 >> >(d_mask, d_cost, d_index, d_out, Num2);
+
+		cudaMemcpy(h_out, d_index, sizeof(int)* Num_Vertex, cudaMemcpyDeviceToHost);
+
+		min_ind = h_out[0];
+		cout << min_ind << endl;
+		if (min_ind == -1)
+			break;
+		h_mask[min_ind] = true;
+		cudaMemcpy(d_cost, h_cost, sizeof(int)*Num_Vertex, cudaMemcpyHostToDevice);
+		dijkstra << < Num_Blocks, Threads_Per_Block >> >(d_graph, d_cost, Num_Edges, min_ind);
+		cudaMemcpy(h_cost, d_cost, sizeof(int)*Num_Vertex, cudaMemcpyDeviceToHost);
+		
+	}
+
+	printf("v=%d\n", Num_Vertex);
+	for (i = 0; i < Num_Vertex; i++)
+	{ 
+		//cout << i << endl;
+		printf("%d %d %d\n", Source, i, h_cost[i]);
+	}
+	QueryPerformanceCounter(&t2);
+	elapsedTime = (t2.QuadPart - t1.QuadPart) * 1000.0 / frequency.QuadPart;
+	cout << elapsedTime << endl;
+	return 0;
+}
